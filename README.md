@@ -1,2 +1,2 @@
 # ImageServer
-Back-end work for the photo uploader
+Back-end project for the photo uploader
