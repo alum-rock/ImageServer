@@ -22,9 +22,23 @@ from flask import Flask, session, redirect, url_for, escape, request, render_tem
 from pymongo import MongoClient
 import pymongo
 import sys
+import ConfigParser
+
+configFile = '/etc/ImgSrv.conf'
 
 app = Flask(__name__)
+
+
+# Config file reading
+Config = ConfigParser.ConfigParser()
+
+Config.read(configFile)
+dbuser = Config.get('Login','username')
+dbpwd  = Config.get('Login','password')
+
+# Database connectivity 
 connection = MongoClient("localhost", serverSelectionTimeoutMS=5000)
+connection.admin.authenticate(dbuser, dbpwd, mechanism='SCRAM-SHA-1')
 
 try:
     connection.server_info()
@@ -34,8 +48,14 @@ except pymongo.errors.ServerSelectionTimeoutError as err:
     sys.exit(1)
 
 @app.route('/')
+def first():
+    db = connection.images
+    output = db.items.find()
+    return "Welcome to the ImageServer, from database: " + str(output[0])
+
+@app.route('/index')
 def index():
-    return "Welcome to the ImageServer"
+    return "Welcome to the ImageServer index"
 
 
 if __name__ == '__main__':
