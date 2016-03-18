@@ -18,13 +18,23 @@
 
 # www.github.com/alum-rock/ImageServer
 
-from flask import Flask, session, redirect, url_for, escape, request, render_template, jsonify
+from flask import Flask, session, redirect, url_for, escape, request, render_template, jsonify, send_file
 from pymongo import MongoClient
 import pymongo
 import sys
 import ConfigParser
+import gridfs
+import argparse
+import cStringIO
+import mimetypes
+import requests
+#import Image
+from PIL import Image
 
-configFile = '/etc/ImgSrv.conf'
+CONFIG_FILE = '/etc/ImgSrv.conf'
+TEST_IMG = '/tmp/forest.jpg'
+HOST = 'localhost'
+PORT = 27017
 
 app = Flask(__name__)
 
@@ -32,13 +42,15 @@ app = Flask(__name__)
 # Config file reading
 Config = ConfigParser.ConfigParser()
 
-Config.read(configFile)
+Config.read(CONFIG_FILE)
 dbuser = Config.get('Login','username')
 dbpwd  = Config.get('Login','password')
 
 # Database connectivity 
-connection = MongoClient("localhost", serverSelectionTimeoutMS=5000)
-connection.admin.authenticate(dbuser, dbpwd, mechanism='SCRAM-SHA-1')
+connection = MongoClient(HOST, serverSelectionTimeoutMS=5000)
+#connection.admin.authenticate(dbuser, dbpwd, mechanism='SCRAM-SHA-1')
+#mongo_con = Connection(HOST , PORT)
+grid_fs = gridfs.GridFS(connection.grid_database)
 
 try:
     connection.server_info()
@@ -57,7 +69,52 @@ def first():
 def index():
     return "Welcome to the ImageServer index"
 
+@app.route('/image/<path:filename>')
+def get_image(filename):
+    """retrieve an image from mongodb gridfs"""
 
-if __name__ == '__main__':
+    if not grid_fs.exists(filename=filename):
+        raise Exception("mongo file does not exist! {0}".format(filename))
+
+    im_stream = grid_fs.get_last_version(filename)
+    im = Image.open(im_stream)
+    return serve_pil_image(im)
+
+@app.route('/addimg')
+def add_image():
+    filename = 'testjpeg.jpg'
+    mimetype='image/jpeg'
+    img = Image.open(TEST_IMG)
+    img_io = cStringIO.StringIO()
+    img.save(img_io, 'JPEG', quality=100)
+    img_io.seek(0)
+    id = grid_fs.put(img_io, contentType=mimetype, filename=filename)
+    print "created file"
+
+
+@app.route('/getimg')
+def get_image():
+    filename = 'testjpeg.jpg'
+    stream = grid_fs.get_last_version(filename)
+    image = Image.open(stream)
+    img_io = cStringIO.StringIO()
+    image.save(img_io, 'JPEG', quality=100)
+    img_io.seek(0)
+    return send_file(img_io, mimetype='image/jpeg')
+
+@app.route('/showimg')
+def show_image():
+    filename = 'testjpeg.jpg'
+    mimetype='image/jpeg'
+    img = Image.open(TEST_IMG)
+    img_io = cStringIO.StringIO()
+    img.save(img_io, 'JPEG', quality=70)
+    img_io.seek(0)
+    return send_file(img_io, mimetype='image/jpeg')
+
+def main():
     app.run(debug=True)
 
+
+if __name__ == '__main__':
+    main()
