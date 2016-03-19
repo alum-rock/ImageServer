@@ -28,6 +28,7 @@ import argparse
 import cStringIO
 import mimetypes
 import requests
+import base64
 #import Image
 from PIL import Image
 
@@ -61,24 +62,53 @@ except pymongo.errors.ServerSelectionTimeoutError as err:
 
 @app.route('/')
 def first():
-    db = connection.images
-    output = db.items.find()
-    return "Welcome to the ImageServer, from database: " + str(output[0])
+    #db = connection.images
+    #output = db.items.find()
+
+    filename = 'testjpeg.jpg'
+    stream = grid_fs.get_last_version(filename)
+    image = Image.open(stream)
+    img_io = cStringIO.StringIO()
+    image.save(img_io, 'JPEG', quality=100)
+    img_io.seek(0)
+    imgStr = base64.b64encode(img_io.getvalue())
+    
+#    return send_file(img_io, mimetype='image/jpeg')
+    img_tag = '<img src="data:image/png;base64,{0}" height="500">'.format(imgStr)
+    toReturn = '<html>'
+    toReturn += '<body>'
+    toReturn += '<title>ImageServer</title>'
+    toReturn += '<center>'
+    toReturn += '<strong>Welcome to the ImageServer</strong>'
+    toReturn += '</center>'
+    toReturn += '<br />'
+    toReturn += '<br />'
+    toReturn += '<center>'
+    toReturn += 'Serving Image from Database'
+    toReturn += '</center>'
+    toReturn += '<br />'
+    toReturn += '<br />'
+    toReturn += '<center>'
+    toReturn += img_tag
+    toReturn += '</center>'
+    toReturn += '</body>'
+    toReturn += '</html>'
+    return toReturn
 
 @app.route('/index')
 def index():
     return "Welcome to the ImageServer index"
 
-@app.route('/image/<path:filename>')
-def get_image(filename):
-    """retrieve an image from mongodb gridfs"""
-
-    if not grid_fs.exists(filename=filename):
-        raise Exception("mongo file does not exist! {0}".format(filename))
-
-    im_stream = grid_fs.get_last_version(filename)
-    im = Image.open(im_stream)
-    return serve_pil_image(im)
+#@app.route('/image/<path:filename>')
+#def get_image(filename):
+#    """retrieve an image from mongodb gridfs"""
+#
+#    if not grid_fs.exists(filename=filename):
+#        raise Exception("mongo file does not exist! {0}".format(filename))
+#
+#    im_stream = grid_fs.get_last_version(filename)
+#    im = Image.open(im_stream)
+#    return serve_pil_image(im)
 
 @app.route('/addimg')
 def add_image():
@@ -89,7 +119,7 @@ def add_image():
     img.save(img_io, 'JPEG', quality=100)
     img_io.seek(0)
     id = grid_fs.put(img_io, contentType=mimetype, filename=filename)
-    print "created file"
+    return "created file"
 
 
 @app.route('/getimg')
@@ -100,6 +130,8 @@ def get_image():
     img_io = cStringIO.StringIO()
     image.save(img_io, 'JPEG', quality=100)
     img_io.seek(0)
+    imgStr = base64.b64encode(img_io.getvalue())
+    
     return send_file(img_io, mimetype='image/jpeg')
 
 @app.route('/showimg')
