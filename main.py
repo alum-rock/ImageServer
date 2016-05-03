@@ -29,7 +29,6 @@ import cStringIO
 import mimetypes
 import requests
 import base64
-#import Image
 from PIL import Image
 
 CONFIG_FILE = '/etc/ImgSrv.conf'
